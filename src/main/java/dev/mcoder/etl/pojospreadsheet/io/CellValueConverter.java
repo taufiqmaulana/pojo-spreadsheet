@@ -1,4 +1,4 @@
-package dev.mcoder.etl.pojospreadsheet.reader;
+package dev.mcoder.etl.pojospreadsheet.io;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

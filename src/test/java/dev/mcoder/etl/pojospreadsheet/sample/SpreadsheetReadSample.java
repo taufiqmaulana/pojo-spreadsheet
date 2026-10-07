@@ -14,8 +14,8 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import dev.mcoder.etl.pojospreadsheet.reader.SpreadsheetReader;
-import dev.mcoder.etl.pojospreadsheet.reader.SpreadsheetValidationException;
+import dev.mcoder.etl.pojospreadsheet.io.SpreadsheetReader;
+import dev.mcoder.etl.pojospreadsheet.io.SpreadsheetValidationException;
 import dev.mcoder.etl.pojospreadsheet.validation.PojoValidator;
 
 /**

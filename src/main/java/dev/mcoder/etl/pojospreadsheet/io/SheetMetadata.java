@@ -1,11 +1,11 @@
-package dev.mcoder.etl.pojospreadsheet.reader;
+package dev.mcoder.etl.pojospreadsheet.io;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 import dev.mcoder.etl.pojospreadsheet.annotation.SheetCol;
-import dev.mcoder.etl.pojospreadsheet.reader.SheetMapping.Column;
+import dev.mcoder.etl.pojospreadsheet.io.SheetMapping.Column;
 
 /**
  * Describes how a POJO maps to spreadsheet columns, for example to build a header row or

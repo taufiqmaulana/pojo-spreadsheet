@@ -1,4 +1,4 @@
-package dev.mcoder.etl.pojospreadsheet.reader;
+package dev.mcoder.etl.pojospreadsheet.io;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,8 +20,8 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 
 import dev.mcoder.etl.pojospreadsheet.annotation.SheetCol;
-import dev.mcoder.etl.pojospreadsheet.reader.CellValueConverter.ConversionException;
-import dev.mcoder.etl.pojospreadsheet.reader.SheetMapping.Column;
+import dev.mcoder.etl.pojospreadsheet.io.CellValueConverter.ConversionException;
+import dev.mcoder.etl.pojospreadsheet.io.SheetMapping.Column;
 import dev.mcoder.etl.pojospreadsheet.validation.PojoValidator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Path.Node;

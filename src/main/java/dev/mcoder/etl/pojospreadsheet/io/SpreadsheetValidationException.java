@@ -1,4 +1,4 @@
-package dev.mcoder.etl.pojospreadsheet.reader;
+package dev.mcoder.etl.pojospreadsheet.io;
 
 import java.util.List;
 import java.util.stream.Collectors;

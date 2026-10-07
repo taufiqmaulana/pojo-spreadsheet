@@ -1,4 +1,4 @@
-package dev.mcoder.etl.pojospreadsheet.reader;
+package dev.mcoder.etl.pojospreadsheet.io;
 
 /**
  * Where to read from: the sheet (by name, or by zero-based index when no name is set) and how

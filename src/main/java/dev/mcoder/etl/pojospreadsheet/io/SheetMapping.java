@@ -1,4 +1,4 @@
-package dev.mcoder.etl.pojospreadsheet.reader;
+package dev.mcoder.etl.pojospreadsheet.io;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -135,6 +135,14 @@ final class SheetMapping<T> {
 
         String cellRef(int rowNumber) {
             return letters + rowNumber;
+        }
+
+        Object get(Object source) {
+            try {
+                return field.get(source);
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException("Cannot read " + field, e);
+            }
         }
 
         void set(Object target, Object value) {

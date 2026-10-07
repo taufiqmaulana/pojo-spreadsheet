@@ -1,12 +1,13 @@
 # pojo-spreadsheet
 
-Reads spreadsheet rows (`.xlsx` and `.xls`) into POJOs using a `@SheetCol` annotation, and validates each POJO with Jakarta Bean Validation.
+Reads spreadsheet rows (`.xlsx` and `.xls`) into POJOs using a `@SheetCol` annotation, validates each POJO with Jakarta Bean Validation, and writes collections of POJOs back to spreadsheets.
 
 - Maps columns to fields by column letter: `@SheetCol("A") private String name;`
 - Converts cells to the field type: text, numbers, booleans, dates and enums
 - Applies the standard Jakarta validation annotations (`@NotBlank`, `@Email`, `@Min`, ...) to every row
 - Reports every invalid cell in the sheet at once, by cell reference (`D4 (Age): ...`)
-- Lists a POJO's column mapping, for example to build a header row
+- Writes collections to `.xlsx` or `.xls`, with a header row of column labels
+- Lists a POJO's column mapping, for example to document an import template
 
 Built on Apache POI 5.5 and Hibernate Validator 9 (Jakarta Validation 3.1).
 
@@ -150,9 +151,54 @@ Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
 validator.validateOrThrow(employee);   // throws ConstraintViolationException when invalid
 ```
 
+## Writing
+
+`SpreadsheetWriter` writes one row per POJO, each `@SheetCol` field in its column. By default the first row is a bold, frozen header holding each column's label.
+
+```java
+SpreadsheetWriter writer = new SpreadsheetWriter();       // thread-safe, reuse
+
+writer.write(employees, EmployeeRow.class, Path.of("employees.xlsx"));   // format from extension: .xlsx or .xls
+writer.write(employees, EmployeeRow.class, outputStream);                // .xlsx
+writer.write(employees, EmployeeRow.class, outputStream, SpreadsheetFormat.XLS,
+        WriteOptions.defaults()
+                .sheet("Employees")                       // default "Sheet1"
+                .header(false));                          // default true
+```
+
+To put several sheets in one file, write each to an open workbook, then save it yourself:
+
+```java
+try (Workbook workbook = new XSSFWorkbook()) {
+    writer.write(active, EmployeeRow.class, workbook, WriteOptions.defaults().sheet("Active"));
+    writer.write(inactive, EmployeeRow.class, workbook, WriteOptions.defaults().sheet("Inactive"));
+    workbook.write(out);
+}
+```
+
+How values are written:
+
+| Field value | Cell |
+|---|---|
+| `String` | Text. Text starting with `=` is still written as text, never as a formula |
+| Numbers | Number |
+| `boolean` / `Boolean` | Boolean |
+| `LocalDate` | Date formatted `yyyy-mm-dd` |
+| `LocalDateTime`, `java.util.Date` | Date formatted `yyyy-mm-dd hh:mm:ss` |
+| Enums | Text of the constant name |
+| `null` | Empty cell |
+
+- **Precision:** spreadsheet numbers are doubles, so a `long`, `BigDecimal` or `BigInteger` with more than 15 significant digits loses precision. Use a `String` field if exact digits matter.
+- **Large collections:** `.xlsx` output is streamed, keeping only 100 rows in memory at a time.
+- **Row limits:** a collection that doesn't fit the format (65,536 rows for `.xls`, 1,048,576 for `.xlsx`, header included) is rejected with `IllegalArgumentException`.
+- **Safe file writes:** writing to a `Path` goes to a temporary file first, so if writing fails an existing file is left unchanged.
+- **No validation:** the writer does not run the Jakarta validation annotations; validate with `PojoValidator` first if needed.
+
+Files written by `SpreadsheetWriter` can be read back with `SpreadsheetReader`.
+
 ## Column metadata
 
-`SheetMetadata.columns` lists a POJO's mapped columns, ordered by column. Use it to build a header row or document an import template.
+`SheetMetadata.columns` lists a POJO's mapped columns, ordered by column. Use it to document an import template or build a custom export.
 
 ```java
 for (ColumnMetadata column : SheetMetadata.columns(EmployeeRow.class)) {
