@@ -17,11 +17,13 @@ Built on Apache POI 5.5 and Hibernate Validator 9 (Jakarta Validation 3.1).
 
 ## Installation
 
+Available from Maven Central. Use the latest version from the [releases](https://github.com/taufiqmaulana/pojo-spreadsheet/releases).
+
 ```xml
 <dependency>
     <groupId>dev.mcoder.etl</groupId>
     <artifactId>pojo-spreadsheet</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>X.Y.Z</version>
 </dependency>
 ```
 
@@ -228,3 +230,19 @@ Runnable samples are in `src/test/java/dev/mcoder/etl/pojospreadsheet/sample`:
 
 - `SpreadsheetReadSample`: reads `EmployeeRow`s from an `.xlsx` file given as the first argument, or from a generated demo workbook
 - `ValidationSample`: validates `Employee` POJOs, including a nested object and list elements
+
+## Releasing
+
+Creating a GitHub release publishes to Maven Central. The tag sets the version: `v1.2.3` publishes `1.2.3`. Published versions can never be changed or deleted, so each release needs a new tag.
+
+The workflow (`.github/workflows/maven-publish.yml`) needs four repository secrets: `CENTRAL_USERNAME` and `CENTRAL_PASSWORD` (a user token from central.sonatype.com), `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`.
+
+To check a release build locally without signing:
+
+```sh
+./mvnw verify -P release -Dgpg.skip
+```
+
+## License
+
+[Apache License 2.0](LICENSE)

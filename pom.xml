@@ -10,15 +10,30 @@
     <packaging>jar</packaging>
 
     <name>pojo-spreadsheet</name>
+    <description>Reads spreadsheet rows into annotated POJOs with Jakarta Bean Validation, and writes POJO collections back to spreadsheets.</description>
+    <url>https://github.com/taufiqmaulana/pojo-spreadsheet</url>
 
-    <distributionManagement>
-        <repository>
-            <!-- Must match server-id in .github/workflows/maven-publish.yml -->
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/taufiqmaulana/pojo-spreadsheet</url>
-        </repository>
-    </distributionManagement>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>taufiqmaulana</id>
+            <name>Taufiq Maulana</name>
+            <url>https://github.com/taufiqmaulana</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/taufiqmaulana/pojo-spreadsheet</url>
+        <connection>scm:git:https://github.com/taufiqmaulana/pojo-spreadsheet.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/taufiqmaulana/pojo-spreadsheet.git</developerConnection>
+    </scm>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
@@ -93,4 +108,78 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Maven Central release: mvn deploy -P release (needs GPG; see .github/workflows/maven-publish.yml) -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.12.0</version>
+                        <configuration>
+                            <!-- Keep checking for broken javadoc, but don't require a comment on every member -->
+                            <doclint>all,-missing</doclint>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.8</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Read the passphrase non-interactively on CI -->
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.11.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <!-- Must match server-id in .github/workflows/maven-publish.yml -->
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
