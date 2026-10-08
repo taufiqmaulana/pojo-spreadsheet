@@ -2,16 +2,19 @@ package dev.mcoder.etl.pojospreadsheet.io;
 
 /**
  * One problem found while reading a sheet: a header label that does not match, a cell that cannot
- * be converted to its field type, or a constraint violation of the row's POJO.
+ * be converted to its field type, a constraint violation of the row's POJO, or an exception thrown
+ * by a record's constructor.
  *
  * <p>{@link #toString()} gives a one-line description, for example
  * {@code D4 (Age): must be greater than or equal to 18 [value: 17]}.
  *
  * @param row          one-based row number, as shown in the spreadsheet application
- * @param cell         cell reference such as {@code "B5"}, or {@code null} when the field is not mapped to a column
- * @param field        name of the POJO field, or {@code null} for a class-level constraint
+ * @param cell         cell reference such as {@code "B5"}, or {@code null} when the problem is not
+ *                     tied to a mapped column
+ * @param field        name of the POJO field, or {@code null} for a class-level constraint or a
+ *                     record constructor exception
  * @param label        the column's {@code @SheetCol} label, or the field name when it has none;
- *                     {@code null} for a class-level constraint
+ *                     {@code null} when {@code field} is
  * @param invalidValue the offending value: the cell text when it could not be converted or is a
  *                     wrong header label, otherwise the converted field value; {@code null} for an
  *                     empty cell

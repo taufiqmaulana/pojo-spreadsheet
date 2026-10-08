@@ -3,6 +3,7 @@
 Reads spreadsheet rows (`.xlsx` and `.xls`) into POJOs using a `@SheetCol` annotation, validates each POJO with Jakarta Bean Validation, and writes collections of POJOs back to spreadsheets.
 
 - Maps columns to fields by column letter: `@SheetCol("A") private String name;`
+- Works with ordinary classes and Java records
 - Converts cells to the field type: text, numbers, booleans, dates and enums
 - Applies the standard Jakarta validation annotations (`@NotBlank`, `@Email`, `@Min`, ...) to every row
 - Reports every invalid cell in the sheet at once, by cell reference (`D4 (Age): ...`)
@@ -49,7 +50,7 @@ The library brings Apache POI, Jakarta Validation, Hibernate Validator and Expre
 
 ## Quick start
 
-Annotate a POJO. It needs a no-argument constructor, which can be private; fields can be private too.
+Annotate a POJO: a class with a no-argument constructor (it can be private, as can the fields), or a [record](#records).
 
 ```java
 public class EmployeeRow {
@@ -115,8 +116,26 @@ writer.write(rows, EmployeeRow.class, Path.of("export.xlsx"));
 
 - Fields in parent classes are mapped too.
 - Fields without `@SheetCol` are left untouched, so a class can hold extra state such as a database ID.
-- `@SheetCol` fields must not be `static` or `final`.
+- `@SheetCol` fields must not be `static` or `final` (record components are the exception; see below).
 - A class with no `@SheetCol` field, an invalid column, an unsupported field type or no no-argument constructor is rejected with `IllegalArgumentException` on first use.
+
+### Records
+
+Annotate the record components. Jakarta constraints on components are validated as on class fields:
+
+```java
+public record ProductRow(
+        @SheetCol(value = "A", label = "SKU") @NotBlank String sku,
+        @SheetCol(value = "B", label = "Price") @DecimalMin("0") BigDecimal price,
+        @SheetCol(value = "C", label = "Quantity") int quantity,
+        String note) {                            // not mapped
+}
+```
+
+- Each row is built by calling the canonical constructor once with every converted value. No no-argument constructor is needed.
+- Components without `@SheetCol` receive `null`, or `0`/`false` for primitives. The same applies to empty cells in primitive components.
+- If the constructor throws, for example a compact constructor checking that `from <= to`, the row is reported as an error with the exception message and no cell: `row 5: from must not be greater than to [value: null]`. When a cell in that row also failed to convert, only the conversion error is reported, since the resulting `null` is the likely cause.
+- Writing reads each component's value, so records can be exported as they are.
 
 ### Supported field types
 
@@ -179,8 +198,8 @@ Reading is all-or-nothing. If any cell cannot be converted or any POJO is invali
 | Component | Example | Notes |
 |---|---|---|
 | `row` | `4` | One-based, as shown in the spreadsheet application |
-| `cell` | `"D4"` | `null` for a constraint on a field without `@SheetCol` |
-| `field` | `"age"` | `null` for a class-level constraint |
+| `cell` | `"D4"` | `null` when the problem isn't tied to a mapped column |
+| `field` | `"age"` | `null` for a class-level constraint or a record constructor exception |
 | `label` | `"Age"` | The `@SheetCol` label, or the field name |
 | `invalidValue` | `"forty"` | The cell text if it could not be converted, otherwise the field value |
 | `message` | `"cannot convert 'forty' to Integer"` | |

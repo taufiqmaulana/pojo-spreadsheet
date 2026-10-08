@@ -19,6 +19,12 @@ import java.lang.annotation.Target;
  * private String employeeId;
  * }</pre>
  *
+ * <p>On a record, annotate the components:
+ *
+ * <pre>{@code
+ * public record EmployeeRow(@SheetCol("A") String employeeId, @SheetCol("B") @NotNull Integer age) {}
+ * }</pre>
+ *
  * <p>Supported field types: {@code String}, {@code boolean}/{@code Boolean}, every primitive
  * number type and its wrapper, {@code BigDecimal}, {@code BigInteger}, {@code LocalDate},
  * {@code LocalDateTime}, {@code java.util.Date} and enums (matched by constant name).

@@ -22,6 +22,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import dev.mcoder.etl.pojospreadsheet.annotation.SheetCol;
 import dev.mcoder.etl.pojospreadsheet.io.CellValueConverter.ConversionException;
 import dev.mcoder.etl.pojospreadsheet.io.SheetMapping.Column;
+import dev.mcoder.etl.pojospreadsheet.io.SheetMapping.ConstructorException;
 import dev.mcoder.etl.pojospreadsheet.validation.PojoValidator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Path.Node;
@@ -46,7 +47,8 @@ import jakarta.validation.Path.Node;
  *       column labels; on a mismatch, no data rows are read.</li>
  *   <li>The header rows are skipped, as are data rows whose mapped cells are all blank.</li>
  *   <li>Each remaining row is converted into a new POJO, one cell per {@code @SheetCol} field,
- *       then validated.</li>
+ *       then validated. A class is created with its no-argument constructor and its fields are
+ *       set; a record is created with its canonical constructor.</li>
  * </ol>
  *
  * <p>Reading is all-or-nothing: if any header label, cell or POJO is invalid, a
@@ -82,8 +84,8 @@ public final class SpreadsheetReader {
      * not its extension. The file is opened read-only.
      *
      * @param file    the workbook to read
-     * @param type    the POJO class; it needs a no-argument constructor and at least one
-     *                {@code @SheetCol} field
+     * @param type    the POJO class, either a record or a class with a no-argument constructor,
+     *                with at least one {@code @SheetCol} field
      * @param options the sheet to read, the number of header rows, and whether to validate the header
      * @return one POJO per non-blank data row, in sheet order
      * @throws SpreadsheetValidationException if any header label, cell or POJO is invalid
@@ -114,8 +116,8 @@ public final class SpreadsheetReader {
      * workbook is loaded into memory. {@code in} is not closed.
      *
      * @param in      the workbook content
-     * @param type    the POJO class; it needs a no-argument constructor and at least one
-     *                {@code @SheetCol} field
+     * @param type    the POJO class, either a record or a class with a no-argument constructor,
+     *                with at least one {@code @SheetCol} field
      * @param options the sheet to read, the number of header rows, and whether to validate the header
      * @return one POJO per non-blank data row, in sheet order
      * @throws SpreadsheetValidationException if any header label, cell or POJO is invalid
@@ -136,8 +138,8 @@ public final class SpreadsheetReader {
      * sheets of one file without opening it again.
      *
      * @param workbook the workbook to read
-     * @param type     the POJO class; it needs a no-argument constructor and at least one
-     *                 {@code @SheetCol} field
+     * @param type     the POJO class, either a record or a class with a no-argument constructor,
+     *                 with at least one {@code @SheetCol} field
      * @param options  the sheet to read, the number of header rows, and whether to validate the header
      * @return one POJO per non-blank data row, in sheet order
      * @throws SpreadsheetValidationException if any header label, cell or POJO is invalid
@@ -160,35 +162,8 @@ public final class SpreadsheetReader {
             if (isBlank(row, mapping)) {
                 continue;
             }
-            int rowNumber = rowIndex + 1;
-            T pojo = mapping.newInstance();
             List<RowError> rowErrors = new ArrayList<>();
-
-            Set<String> unconvertedFields = new HashSet<>();
-            for (Column column : mapping.columns()) {
-                Cell cell = row.getCell(column.index(), MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                try {
-                    column.set(pojo, converter.convert(cell, column.type()));
-                } catch (ConversionException e) {
-                    unconvertedFields.add(column.fieldName());
-                    rowErrors.add(new RowError(rowNumber, column.cellRef(rowNumber), column.fieldName(),
-                            column.label(), converter.text(cell), e.getMessage()));
-                }
-            }
-
-            for (ConstraintViolation<T> violation : validator.validate(pojo)) {
-                String fieldName = rootFieldName(violation);
-                if (unconvertedFields.contains(fieldName)) {
-                    continue; // already reported; the field is only null because conversion failed
-                }
-                Column column = mapping.column(fieldName);
-                rowErrors.add(new RowError(rowNumber,
-                        column == null ? null : column.cellRef(rowNumber),
-                        fieldName,
-                        column == null ? fieldName : column.label(),
-                        violation.getInvalidValue(), violation.getMessage()));
-            }
-
+            T pojo = readRow(row, rowIndex + 1, mapping, converter, rowErrors);
             if (rowErrors.isEmpty()) {
                 result.add(pojo);
             } else {
@@ -202,6 +177,54 @@ public final class SpreadsheetReader {
             throw new SpreadsheetValidationException(errors);
         }
         return result;
+    }
+
+    /**
+     * Converts and validates one row, adding any problems to {@code rowErrors}.
+     *
+     * @return the POJO, or {@code null} if a record's constructor rejected the values
+     */
+    private <T> T readRow(Row row, int rowNumber, SheetMapping<T> mapping, CellValueConverter converter,
+            List<RowError> rowErrors) {
+        Object[] values = new Object[mapping.columnCount()];
+        Set<String> unconvertedFields = new HashSet<>();
+        int i = 0;
+        for (Column column : mapping.columns()) {
+            Cell cell = row.getCell(column.index(), MissingCellPolicy.RETURN_BLANK_AS_NULL);
+            try {
+                values[i] = converter.convert(cell, column.type());
+            } catch (ConversionException e) {
+                unconvertedFields.add(column.fieldName());
+                rowErrors.add(new RowError(rowNumber, column.cellRef(rowNumber), column.fieldName(),
+                        column.label(), converter.text(cell), e.getMessage()));
+            }
+            i++;
+        }
+
+        T pojo;
+        try {
+            pojo = mapping.newInstance(values);
+        } catch (ConstructorException e) {
+            // Not tied to one cell. Skipped when conversion failed, as the nulls left behind are the likely cause
+            if (rowErrors.isEmpty()) {
+                rowErrors.add(new RowError(rowNumber, null, null, null, null, e.getMessage()));
+            }
+            return null;
+        }
+
+        for (ConstraintViolation<T> violation : validator.validate(pojo)) {
+            String fieldName = rootFieldName(violation);
+            if (unconvertedFields.contains(fieldName)) {
+                continue; // already reported; the field is only null because conversion failed
+            }
+            Column column = mapping.column(fieldName);
+            rowErrors.add(new RowError(rowNumber,
+                    column == null ? null : column.cellRef(rowNumber),
+                    fieldName,
+                    column == null ? fieldName : column.label(),
+                    violation.getInvalidValue(), violation.getMessage()));
+        }
+        return pojo;
     }
 
     private static Sheet sheet(Workbook workbook, ReadOptions options) {
