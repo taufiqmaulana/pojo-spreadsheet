@@ -1,3 +1,5 @@
+![pojo-spreadsheet: spreadsheet rows are parsed into annotated Java POJOs, validated, and written back to a sheet](illustration.jpg)
+
 # pojo-spreadsheet
 
 Reads spreadsheet rows (`.xlsx` and `.xls`) into POJOs using a `@SheetCol` annotation, validates each POJO with Jakarta Bean Validation, and writes collections of POJOs back to spreadsheets.
