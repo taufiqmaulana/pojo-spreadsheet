@@ -24,6 +24,7 @@ Built on Apache POI 5.5 and Hibernate Validator 9 (Jakarta Validation 3.1).
 - [Writing](#writing)
 - [Column metadata](#column-metadata)
 - [Using with Spring Boot](#using-with-spring-boot)
+- [Samples](#samples)
 - [Exceptions](#exceptions)
 - [Logging](#logging)
 - [Build](#build)
@@ -297,7 +298,9 @@ for (ColumnMetadata column : SheetMetadata.columns(EmployeeRow.class)) {
 
 ## Using with Spring Boot
 
-The library has no Spring dependency, but fits naturally. Register the three classes as beans; Spring calls `PojoValidator.close()` on shutdown:
+The library has no Spring dependency, but fits naturally. The snippets below are simplified from [`example/springboot-web-jpa`](example/springboot-web-jpa), a complete runnable app; see [Samples](#samples).
+
+Register the three classes as beans; Spring calls `PojoValidator.close()` on shutdown:
 
 ```java
 @Configuration
@@ -348,6 +351,35 @@ ProblemDetail invalidSpreadsheet(SpreadsheetValidationException e) {
 
 Spring Boot's validation starter can run alongside; both use Hibernate Validator.
 
+## Samples
+
+### Spring Boot app
+
+[`example/springboot-web-jpa`](example/springboot-web-jpa) is a Spring Boot 4 application (Web MVC, Data JPA, embedded H2) that imports and exports an `employee` table:
+
+- `POST /api/employees/import` reads an uploaded `.xlsx` with header validation and saves all rows in one transaction, or none
+- `GET /api/employees/export` downloads the table as `.xlsx`
+- `GET /api/employees/template` downloads an empty file with the header row
+- `http://localhost:8080` has an upload form, download links and a live view of the table
+- Invalid uploads return a `400` problem response listing every bad cell
+
+It is a separate Maven project that depends on the library's current snapshot, so install the library first:
+
+```sh
+./mvnw install -DskipTests
+cd example/springboot-web-jpa
+./mvnw spring-boot:run
+```
+
+See its [README](example/springboot-web-jpa/README.md) for the endpoints and how the code is organized.
+
+### Code samples
+
+Small runnable programs are in `src/test/java/dev/mcoder/etl/pojospreadsheet/sample`:
+
+- `SpreadsheetReadSample`: reads `EmployeeRow`s from an `.xlsx` file given as the first argument, or from a generated demo workbook
+- `ValidationSample`: validates `Employee` POJOs, including a nested object and list elements
+
 ## Exceptions
 
 All exceptions are unchecked.
@@ -373,12 +405,7 @@ Apache POI logs through the Log4j API. If your application provides no Log4j imp
 
 `JAVA_HOME` must point to a JDK 17+. The Maven wrapper downloads Maven, so no Maven installation is needed.
 
-### Samples
-
-Runnable samples are in `src/test/java/dev/mcoder/etl/pojospreadsheet/sample`:
-
-- `SpreadsheetReadSample`: reads `EmployeeRow`s from an `.xlsx` file given as the first argument, or from a generated demo workbook
-- `ValidationSample`: validates `Employee` POJOs, including a nested object and list elements
+This builds only the library; `example/springboot-web-jpa` is not a module of it and is never published. Build the sample from its own directory, after `./mvnw install`.
 
 ### Releasing
 

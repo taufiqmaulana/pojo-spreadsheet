@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Employee spreadsheet sample</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+        section { margin-bottom: 2rem; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: .35rem .6rem; text-align: left; }
+        th { background: #f3f3f3; }
+        pre { background: #f7f7f7; padding: .75rem; white-space: pre-wrap; }
+        .error { color: #b00020; }
+    </style>
+</head>
+<body>
+<h1>Employee spreadsheet sample</h1>
+<p>Spring Boot + JPA + embedded H2, using <code>pojo-spreadsheet</code> for import and export.</p>
+
+<section>
+    <h2>Export</h2>
+    <a href="/api/employees/export">Download employees.xlsx</a> ·
+    <a href="/api/employees/template">Download empty template</a>
+</section>
+
+<section>
+    <h2>Import</h2>
+    <form id="import-form">
+        <input type="file" name="file" accept=".xlsx,.xls" required>
+        <label><input type="checkbox" name="replace" value="true"> Replace existing rows</label>
+        <button type="submit">Import</button>
+    </form>
+    <pre id="result" hidden></pre>
+</section>
+
+<section>
+    <h2>Employees table</h2>
+    <table>
+        <thead>
+        <tr><th>Employee ID</th><th>Full name</th><th>Email</th><th>Age</th><th>Salary</th><th>Join date</th><th>Status</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+    </table>
+</section>
+
+<script>
+    const result = document.getElementById('result');
+
+    async function loadRows() {
+        const employees = await (await fetch('/api/employees')).json();
+        const rows = document.getElementById('rows');
+        rows.replaceChildren(...employees.map(e => {
+            const tr = document.createElement('tr');
+            for (const value of [e.employeeId, e.fullName, e.email, e.age, e.salary, e.joinDate, e.status]) {
+                const td = document.createElement('td');
+                td.textContent = value ?? '';
+                tr.append(td);
+            }
+            return tr;
+        }));
+    }
+
+    document.getElementById('import-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = new FormData(event.target);
+        const replace = form.get('replace') === 'true';
+        form.delete('replace');
+        const response = await fetch('/api/employees/import?replace=' + replace, { method: 'POST', body: form });
+        const body = await response.json();
+        result.hidden = false;
+        result.className = response.ok ? '' : 'error';
+        result.textContent = response.ok
+            ? `Imported ${body.imported} row(s); table now holds ${body.total}.`
+            : [body.detail, ...(body.errors ?? []).map(err => `  ${err.cell} (${err.label}): ${err.message} [value: ${err.invalidValue}]`)].join('\n');
+        loadRows();
+    });
+
+    loadRows();
+</script>
+</body>
+</html>
