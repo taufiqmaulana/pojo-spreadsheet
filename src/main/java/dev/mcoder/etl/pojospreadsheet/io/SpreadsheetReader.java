@@ -77,7 +77,9 @@ public final class SpreadsheetReader {
     /**
      * Reads from an already open {@code workbook}, which is not closed.
      *
-     * @throws SpreadsheetValidationException if any cell cannot be converted or any POJO is invalid
+     * @throws SpreadsheetValidationException if any cell cannot be converted or any POJO is invalid,
+     *                                        or, with {@link ReadOptions#validateHeader()}, any header
+     *                                        label does not match
      */
     public <T> List<T> read(Workbook workbook, Class<T> type, ReadOptions options) {
         Objects.requireNonNull(workbook, "workbook");
@@ -85,6 +87,9 @@ public final class SpreadsheetReader {
         SheetMapping<T> mapping = SheetMapping.of(type);
         Sheet sheet = sheet(workbook, options);
         CellValueConverter converter = new CellValueConverter();
+        if (options.validateHeader()) {
+            validateHeader(sheet, options.headerRows() - 1, mapping, converter);
+        }
 
         List<T> result = new ArrayList<>();
         List<RowError> errors = new ArrayList<>();
@@ -150,6 +155,29 @@ public final class SpreadsheetReader {
                     + "; the workbook has " + workbook.getNumberOfSheets());
         }
         return workbook.getSheetAt(options.sheetIndex());
+    }
+
+    /**
+     * Checks every mapped column's header cell against its label. Data rows are not read when the
+     * header is wrong, since a shifted or renamed column would otherwise surface as many data errors.
+     */
+    private static void validateHeader(Sheet sheet, int rowIndex, SheetMapping<?> mapping,
+            CellValueConverter converter) {
+        Row row = sheet.getRow(rowIndex);
+        int rowNumber = rowIndex + 1;
+        List<RowError> errors = new ArrayList<>();
+        for (Column column : mapping.columns()) {
+            Cell cell = row == null ? null : row.getCell(column.index(), MissingCellPolicy.RETURN_BLANK_AS_NULL);
+            String text = converter.text(cell);
+            if (text == null || !text.trim().equalsIgnoreCase(column.label())) {
+                errors.add(new RowError(rowNumber, column.cellRef(rowNumber), column.fieldName(), column.label(),
+                        text, "header must be '" + column.label() + "'"));
+            }
+        }
+        if (!errors.isEmpty()) {
+            errors.sort(Comparator.comparingInt(error -> columnIndex(mapping, error.field())));
+            throw new SpreadsheetValidationException(errors);
+        }
     }
 
     private static boolean isBlank(Row row, SheetMapping<?> mapping) {

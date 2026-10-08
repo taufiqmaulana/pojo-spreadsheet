@@ -226,6 +226,57 @@ class SpreadsheetReaderTest {
         assertFalse(reader.read(new ByteArrayInputStream(xlsx), EmployeeRow.class).iterator().hasNext());
     }
 
+    @Test
+    void validateHeaderAcceptsLabelsIgnoringCaseAndWhitespace() throws IOException {
+        byte[] xlsx = xlsx(sheet -> {
+            employee(sheet, 0, " employee id ", "FULL NAME", "Email", "Age", "Salary", "Join date", "status");
+            employee(sheet, 1, "EMP-00001", "Jane Doe", "jane@example.com", 30, 100, LocalDate.of(2020, 1, 15), "ACTIVE");
+        });
+
+        List<EmployeeRow> rows = reader.read(new ByteArrayInputStream(xlsx), EmployeeRow.class,
+                ReadOptions.defaults().validateHeader(true));
+
+        assertEquals(1, rows.size());
+    }
+
+    @Test
+    void validateHeaderReportsEveryWrongOrMissingLabelBeforeReadingData() throws IOException {
+        byte[] xlsx = xlsx(sheet -> {
+            employee(sheet, 0, "Employee ID", "Email", "Full name", "Age", "Salary", "Join date");
+            employee(sheet, 1, "EMP-1", "Jane Doe", "not-an-email", 17, 100, LocalDate.of(2020, 1, 15), "ACTIVE");
+        });
+
+        SpreadsheetValidationException e = assertThrows(SpreadsheetValidationException.class,
+                () -> reader.read(new ByteArrayInputStream(xlsx), EmployeeRow.class,
+                        ReadOptions.defaults().validateHeader(true)));
+
+        assertEquals(List.of("B1", "C1", "G1"), e.getErrors().stream().map(RowError::cell).toList());
+        RowError first = e.getErrors().get(0);
+        assertEquals("Email", first.invalidValue());
+        assertEquals("header must be 'Full name'", first.message());
+        assertNull(e.getErrors().get(2).invalidValue());
+    }
+
+    @Test
+    void validateHeaderChecksTheLastHeaderRow() throws IOException {
+        byte[] labelsInFirstRow = xlsx(sheet -> header(sheet));
+        byte[] titleThenLabels = xlsx(sheet -> {
+            sheet.createRow(0).createCell(0).setCellValue("Employee export");
+            employee(sheet, 1, "Employee ID", "Full name", "Email", "Age", "Salary", "Join date", "Status");
+        });
+        ReadOptions twoHeaderRows = ReadOptions.defaults().headerRows(2).validateHeader(true);
+
+        assertThrows(SpreadsheetValidationException.class,
+                () -> reader.read(new ByteArrayInputStream(labelsInFirstRow), EmployeeRow.class, twoHeaderRows));
+        assertTrue(reader.read(new ByteArrayInputStream(titleThenLabels), EmployeeRow.class, twoHeaderRows).isEmpty());
+    }
+
+    @Test
+    void validateHeaderRequiresAHeaderRow() {
+        assertThrows(IllegalArgumentException.class, () -> ReadOptions.defaults().headerRows(0).validateHeader(true));
+        assertThrows(IllegalArgumentException.class, () -> ReadOptions.defaults().validateHeader(true).headerRows(0));
+    }
+
     static class Types {
         @SheetCol("A") String text;
         @SheetCol("B") int primitiveInt;

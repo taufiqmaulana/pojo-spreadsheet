@@ -106,8 +106,21 @@ How cells are read:
 reader.read(path, EmployeeRow.class);                     // first sheet, skips 1 header row
 reader.read(path, EmployeeRow.class, ReadOptions.defaults()
         .sheet("Employees")                               // or .sheet(2) for a zero-based index
-        .headerRows(2));
+        .headerRows(2)
+        .validateHeader(true));                           // check header labels, default false
 ```
+
+### Header validation
+
+With `validateHeader(true)`, the last header row must hold each mapped column's label (the `@SheetCol` label, or the field name when it has none). Labels are compared ignoring case and surrounding whitespace, and extra unmapped columns are allowed. If any label is wrong or missing, a `SpreadsheetValidationException` is thrown with one error per header cell, and no data rows are read:
+
+```
+2 invalid value(s) in sheet:
+  B1 (Full name): header must be 'Full name' [value: Email]
+  C1 (Email): header must be 'Email' [value: Full name]
+```
+
+This catches files with shifted, swapped or renamed columns, which would otherwise be read into the wrong fields. Files written by `SpreadsheetWriter` with a header always pass. It requires `headerRows` of at least 1.
 
 `read` accepts a `Path`, an `InputStream` or an open POI `Workbook`. The reader does not close an `InputStream` or `Workbook` you pass in.
 
