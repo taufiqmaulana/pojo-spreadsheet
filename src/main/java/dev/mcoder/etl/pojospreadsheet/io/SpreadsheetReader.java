@@ -30,24 +30,67 @@ import jakarta.validation.Path.Node;
  * Reads the rows of a spreadsheet (.xlsx or .xls) into POJOs whose fields are annotated with
  * {@link SheetCol}, then validates each POJO against its Jakarta Bean Validation annotations.
  *
- * <p>Rows whose mapped cells are all blank are skipped. If any cell cannot be converted or any
- * POJO is invalid, a {@link SpreadsheetValidationException} listing every error is thrown, so
- * the caller gets either all rows or none.
+ * <pre>{@code
+ * SpreadsheetReader reader = new SpreadsheetReader(new PojoValidator());
+ * try {
+ *     List<EmployeeRow> rows = reader.read(Path.of("employees.xlsx"), EmployeeRow.class);
+ * } catch (SpreadsheetValidationException e) {
+ *     e.getErrors().forEach(System.out::println);   // D4 (Age): must be greater than or equal to 18 [value: 17]
+ * }
+ * }</pre>
+ *
+ * <p>Reading proceeds as follows:
+ * <ol>
+ *   <li>The sheet is selected by {@link ReadOptions} (the first sheet by default).</li>
+ *   <li>With {@link ReadOptions#validateHeader()}, the last header row is checked against the
+ *       column labels; on a mismatch, no data rows are read.</li>
+ *   <li>The header rows are skipped, as are data rows whose mapped cells are all blank.</li>
+ *   <li>Each remaining row is converted into a new POJO, one cell per {@code @SheetCol} field,
+ *       then validated.</li>
+ * </ol>
+ *
+ * <p>Reading is all-or-nothing: if any header label, cell or POJO is invalid, a
+ * {@link SpreadsheetValidationException} listing every error in the sheet is thrown, and no rows
+ * are returned.
  *
  * <p>Thread-safe; reuse one instance.
+ *
+ * @see SpreadsheetWriter
  */
 public final class SpreadsheetReader {
 
     private final PojoValidator validator;
 
+    /**
+     * @param validator validates each row's POJO; the reader does not close it
+     */
     public SpreadsheetReader(PojoValidator validator) {
         this.validator = Objects.requireNonNull(validator, "validator");
     }
 
+    /**
+     * Reads {@code file} with {@link ReadOptions#defaults()}: the first sheet, skipping one header row.
+     *
+     * @see #read(Path, Class, ReadOptions)
+     */
     public <T> List<T> read(Path file, Class<T> type) {
         return read(file, type, ReadOptions.defaults());
     }
 
+    /**
+     * Reads {@code file}, an .xlsx or .xls workbook; the format is detected from its content,
+     * not its extension. The file is opened read-only.
+     *
+     * @param file    the workbook to read
+     * @param type    the POJO class; it needs a no-argument constructor and at least one
+     *                {@code @SheetCol} field
+     * @param options the sheet to read, the number of header rows, and whether to validate the header
+     * @return one POJO per non-blank data row, in sheet order
+     * @throws SpreadsheetValidationException if any header label, cell or POJO is invalid
+     * @throws IllegalArgumentException       if {@code type} cannot be mapped, the sheet does not
+     *                                        exist, or the file is a damaged .xlsx
+     * @throws UncheckedIOException           if the file cannot be read or is not a spreadsheet
+     */
     public <T> List<T> read(Path file, Class<T> type, ReadOptions options) {
         try (Workbook workbook = WorkbookFactory.create(file.toFile(), null, true)) {
             return read(workbook, type, options);
@@ -57,14 +100,28 @@ public final class SpreadsheetReader {
     }
 
     /**
-     * Reads from {@code in}, which is not closed.
+     * Reads from {@code in} with {@link ReadOptions#defaults()}: the first sheet, skipping one
+     * header row. {@code in} is not closed.
+     *
+     * @see #read(InputStream, Class, ReadOptions)
      */
     public <T> List<T> read(InputStream in, Class<T> type) {
         return read(in, type, ReadOptions.defaults());
     }
 
     /**
-     * Reads from {@code in}, which is not closed.
+     * Reads an .xlsx or .xls workbook from {@code in}, such as an uploaded file. The whole
+     * workbook is loaded into memory. {@code in} is not closed.
+     *
+     * @param in      the workbook content
+     * @param type    the POJO class; it needs a no-argument constructor and at least one
+     *                {@code @SheetCol} field
+     * @param options the sheet to read, the number of header rows, and whether to validate the header
+     * @return one POJO per non-blank data row, in sheet order
+     * @throws SpreadsheetValidationException if any header label, cell or POJO is invalid
+     * @throws IllegalArgumentException       if {@code type} cannot be mapped, the sheet does not
+     *                                        exist, or the content is a damaged .xlsx
+     * @throws UncheckedIOException           if {@code in} cannot be read or is not a spreadsheet
      */
     public <T> List<T> read(InputStream in, Class<T> type, ReadOptions options) {
         try (Workbook workbook = WorkbookFactory.create(in)) {
@@ -75,11 +132,16 @@ public final class SpreadsheetReader {
     }
 
     /**
-     * Reads from an already open {@code workbook}, which is not closed.
+     * Reads from an already open {@code workbook}, which is not closed. Use this to read several
+     * sheets of one file without opening it again.
      *
-     * @throws SpreadsheetValidationException if any cell cannot be converted or any POJO is invalid,
-     *                                        or, with {@link ReadOptions#validateHeader()}, any header
-     *                                        label does not match
+     * @param workbook the workbook to read
+     * @param type     the POJO class; it needs a no-argument constructor and at least one
+     *                 {@code @SheetCol} field
+     * @param options  the sheet to read, the number of header rows, and whether to validate the header
+     * @return one POJO per non-blank data row, in sheet order
+     * @throws SpreadsheetValidationException if any header label, cell or POJO is invalid
+     * @throws IllegalArgumentException       if {@code type} cannot be mapped or the sheet does not exist
      */
     public <T> List<T> read(Workbook workbook, Class<T> type, ReadOptions options) {
         Objects.requireNonNull(workbook, "workbook");

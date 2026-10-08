@@ -34,8 +34,9 @@ public @interface SheetCol {
     String value();
 
     /**
-     * Human-readable column name used in error reports, for example the sheet's header text.
-     * Defaults to the field name when empty.
+     * Human-readable column name, normally the sheet's header text. It is used in error reports,
+     * written as the header by {@code SpreadsheetWriter}, and checked against the header when
+     * reading with {@code ReadOptions.validateHeader(true)}. Defaults to the field name when empty.
      */
     String label() default "";
 }

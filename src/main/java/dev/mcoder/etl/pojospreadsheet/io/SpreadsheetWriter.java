@@ -35,8 +35,18 @@ import dev.mcoder.etl.pojospreadsheet.io.SheetMapping.Column;
  * {@code BigDecimal} or {@code BigInteger} with more than 15 significant digits loses precision.
  * Text is always written as text, never as a formula.
  *
- * <p>.xlsx files are streamed, so large collections do not need the whole workbook in memory.
- * Thread-safe; reuse one instance.
+ * <pre>{@code
+ * SpreadsheetWriter writer = new SpreadsheetWriter();
+ * writer.write(employees, EmployeeRow.class, Path.of("employees.xlsx"));
+ * }</pre>
+ *
+ * <p>The writer does not run Jakarta validation; validate with
+ * {@link dev.mcoder.etl.pojospreadsheet.validation.PojoValidator} first if needed.
+ *
+ * <p>When writing to a {@code Path} or {@code OutputStream}, .xlsx output is streamed, keeping only
+ * 100 rows in memory at a time. Thread-safe; reuse one instance.
+ *
+ * @see SpreadsheetReader
  */
 public final class SpreadsheetWriter {
 
@@ -44,15 +54,28 @@ public final class SpreadsheetWriter {
     private static final int STREAMING_WINDOW = 100;
 
     /**
-     * Writes to {@code file}, replacing it if it exists. The format follows the file extension.
+     * Writes to {@code file} with {@link WriteOptions#defaults()}: a sheet named {@code Sheet1}
+     * with a header row.
+     *
+     * @see #write(Collection, Class, Path, WriteOptions)
      */
     public <T> void write(Collection<? extends T> items, Class<T> type, Path file) {
         write(items, type, file, WriteOptions.defaults());
     }
 
     /**
-     * Writes to {@code file}, replacing it if it exists. The format follows the file extension.
-     * If writing fails, an existing file is left unchanged.
+     * Writes to {@code file}, replacing it if it exists. The format follows the file extension,
+     * {@code .xlsx} or {@code .xls}. The workbook is written to a temporary file in the same
+     * directory first, so if writing fails an existing file is left unchanged.
+     *
+     * @param items   the POJOs to write, one row each, in iteration order; must not contain {@code null}
+     * @param type    the POJO class whose {@code @SheetCol} fields define the columns
+     * @param file    the file to create or replace; its directory must exist
+     * @param options the sheet name and whether to write a header row
+     * @throws IllegalArgumentException if the extension is neither {@code .xlsx} nor {@code .xls},
+     *                                  {@code type} cannot be mapped, {@code items} contains
+     *                                  {@code null}, or the items do not fit in one sheet
+     * @throws UncheckedIOException     if the file cannot be written
      */
     public <T> void write(Collection<? extends T> items, Class<T> type, Path file, WriteOptions options) {
         SpreadsheetFormat format = SpreadsheetFormat.of(file);
@@ -79,14 +102,27 @@ public final class SpreadsheetWriter {
     }
 
     /**
-     * Writes an .xlsx workbook to {@code out}, which is not closed.
+     * Writes an .xlsx workbook to {@code out} with {@link WriteOptions#defaults()}: a sheet named
+     * {@code Sheet1} with a header row. {@code out} is not closed.
+     *
+     * @see #write(Collection, Class, OutputStream, SpreadsheetFormat, WriteOptions)
      */
     public <T> void write(Collection<? extends T> items, Class<T> type, OutputStream out) {
         write(items, type, out, SpreadsheetFormat.XLSX, WriteOptions.defaults());
     }
 
     /**
-     * Writes a workbook in {@code format} to {@code out}, which is not closed.
+     * Writes a workbook in {@code format} to {@code out}, such as an HTTP response.
+     * {@code out} is not closed.
+     *
+     * @param items   the POJOs to write, one row each, in iteration order; must not contain {@code null}
+     * @param type    the POJO class whose {@code @SheetCol} fields define the columns
+     * @param out     where to write the workbook
+     * @param format  {@link SpreadsheetFormat#XLSX} or {@link SpreadsheetFormat#XLS}
+     * @param options the sheet name and whether to write a header row
+     * @throws IllegalArgumentException if {@code type} cannot be mapped, {@code items} contains
+     *                                  {@code null}, or the items do not fit in one sheet
+     * @throws UncheckedIOException     if writing to {@code out} fails
      */
     public <T> void write(Collection<? extends T> items, Class<T> type, OutputStream out,
             SpreadsheetFormat format, WriteOptions options) {
@@ -107,11 +143,26 @@ public final class SpreadsheetWriter {
 
     /**
      * Adds a sheet to {@code workbook} and writes the items to it. The workbook is neither saved
-     * nor closed, so further sheets can be added.
+     * nor closed, so further sheets can be added. The returned sheet can be customized further,
+     * for example with column widths, before saving.
      *
+     * <pre>{@code
+     * try (Workbook workbook = new XSSFWorkbook()) {
+     *     writer.write(active, EmployeeRow.class, workbook, WriteOptions.defaults().sheet("Active"));
+     *     writer.write(inactive, EmployeeRow.class, workbook, WriteOptions.defaults().sheet("Inactive"));
+     *     workbook.write(out);
+     * }
+     * }</pre>
+     *
+     * @param items    the POJOs to write, one row each, in iteration order; must not contain {@code null}
+     * @param type     the POJO class whose {@code @SheetCol} fields define the columns
+     * @param workbook the workbook to add the sheet to; its type decides the format and whether
+     *                 rows are streamed
+     * @param options  the sheet name and whether to write a header row
      * @return the new sheet
-     * @throws IllegalArgumentException if the workbook already has a sheet with that name, or the
-     *                                  items do not fit in a sheet of the workbook's format
+     * @throws IllegalArgumentException if {@code type} cannot be mapped, the workbook already has a
+     *                                  sheet with that name, {@code items} contains {@code null},
+     *                                  or the items do not fit in a sheet of the workbook's format
      */
     public <T> Sheet write(Collection<? extends T> items, Class<T> type, Workbook workbook, WriteOptions options) {
         Objects.requireNonNull(items, "items");
