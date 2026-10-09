@@ -45,13 +45,15 @@ jobs:
           echo "::error::Release tag '$TAG' is not a version such as v1.2.3 or 1.2.3"
           exit 1
         fi
-        mvn -B -q org.codehaus.mojo:versions-maven-plugin:2.18.0:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+        ./mvnw -B -q org.codehaus.mojo:versions-maven-plugin:2.18.0:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
         echo "Publishing version $VERSION"
 
     # Runs the tests, attaches sources and javadoc, signs everything, uploads to the
-    # Central Publisher Portal and waits until the release is published
+    # Central Publisher Portal and waits until the release is published.
+    # Uses the wrapper's Maven 3.9: with Maven 3.10, central-publishing-maven-plugin 0.11.0 leaves
+    # maven-metadata-local.xml in the bundle and Central rejects it ("does NOT have a .pom file")
     - name: Publish to Maven Central
-      run: mvn -B deploy -P release
+      run: ./mvnw -B deploy -P release
       env:
         CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
         CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
